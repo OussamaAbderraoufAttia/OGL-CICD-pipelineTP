@@ -19,5 +19,22 @@ pipeline {
                 }
             }
         }
+        stage('Code Analysis') {
+                     steps {
+                         // Utilisation du nom du serveur configuré dans Jenkins (ex: 'sonar')
+                         withSonarQubeEnv('sonar') {
+                             bat './gradlew sonar'
+                         }
+                     }
+                 }
+
+                 stage("Code Quality") {
+                     steps {
+                         // Attend le retour du Webhook de SonarQube pour valider la Quality Gate
+                         timeout(time: 1, unit: 'HOURS') {
+                             waitForQualityGate abortPipeline: true
+                         }
+                     }
+                 }
     }
 }
