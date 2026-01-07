@@ -9,13 +9,13 @@ pipeline {
             }
             post {
                 always {
-                    // 2. Archivage des résultats des tests unitaires pour Jenkins
-                    junit 'build/test-results/test/*.xml'
+                    // Archivage des résultats JUnit (Standard)
+                    junit '**/build/test-results/test/*.xml'
 
-                    // 3. Génération du rapport visuel Cucumber
+                    // Génération du rapport Cucumber
                     cucumber buildStatus: 'unstable',
-                             fileIncludePattern: '**/*.json',
-                             jsonReportDirectory: 'json:reports/'
+                             fileIncludePattern: 'example-report.json',
+                             jsonReportDirectory: 'reports'
                 }
             }
         }
