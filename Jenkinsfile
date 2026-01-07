@@ -13,9 +13,9 @@ pipeline {
                     junit 'build/test-results/test/*.xml'
 
                     // 3. Génération du rapport visuel Cucumber
-                    cucumber
+                    cucumber buildStatus: 'unstable',
                              fileIncludePattern: '**/*.json',
-                             jsonReportDirectory: 'json:reports/example-report.json'
+                             jsonReportDirectory: 'json:reports/'
                 }
             }
         }
