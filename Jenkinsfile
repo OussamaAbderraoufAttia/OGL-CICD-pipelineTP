@@ -13,10 +13,9 @@ pipeline {
                     junit 'build/test-results/test/*.xml'
 
                     // 3. Génération du rapport visuel Cucumber
-                    // Note: Le plugin "Cucumber reports" doit être installé [cite: 13]
-                    cucumber buildStatus: 'unstable',
+                    cucumber
                              fileIncludePattern: '**/*.json',
-                             jsonReportDirectory: 'build/test-results/test'
+                             jsonReportDirectory: 'json:reports/example-report.json'
                 }
             }
         }
