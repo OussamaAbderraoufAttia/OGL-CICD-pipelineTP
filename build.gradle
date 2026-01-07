@@ -35,14 +35,6 @@ javadoc {
     options.docTitle = "TP7 - Documentation de l'API"
 }
 
-jacocoTestReport {
-    dependsOn test
-    reports {
-        xml.required = true // Crucial for SonarQube to read coverage
-        html.required = true
-        html.outputLocation = layout.buildDirectory.dir("reports/jacoco")
-    }
-}
 
 // Deployment configuration for the 'Deploy' phase [cite: 1]
 publishing {
