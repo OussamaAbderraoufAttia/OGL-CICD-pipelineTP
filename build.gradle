@@ -92,3 +92,4 @@ javadoc {
 tasks.named('test') {
     finalizedBy 'jacocoTestReport'
 }
+// add anything
