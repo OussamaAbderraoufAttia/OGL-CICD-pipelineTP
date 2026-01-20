@@ -1,8 +1,8 @@
 plugins {
     id 'java'
-    id 'jacoco'
     id 'maven-publish'
-    id 'org.sonarqube' version '4.4.1.3373' // Required for Jenkins to trigger the analysis
+    id 'jacoco'
+    id 'org.sonarqube' version '5.1.0.4882'
 }
 
 group = 'attia.oussama.abderraouf'
@@ -13,38 +13,49 @@ repositories {
 }
 
 dependencies {
-    // Cucumber dependencies remain for running tests, 
-    // but the reporting logic is moved to Jenkins
     testImplementation 'io.cucumber:cucumber-java:6.0.0'
     testImplementation 'io.cucumber:cucumber-junit:6.0.0'
-    testImplementation 'junit:junit:4.12'
+    testImplementation 'junit:junit:4.13.2'
+}
+
+test {
+    useJUnit()
 }
 
 jacoco {
-    toolVersion = "0.8.8"
+    toolVersion = "0.8.12"
 }
 
-// Documentation generation for the 'Build' phase [cite: 1]
-javadoc {
-    options.encoding = 'UTF-8'
-    options.charSet = 'UTF-8'
-    destinationDir = file("${layout.buildDirectory.get()}/docs/javadoc")
-    options.author = true
-    options.version = true
-    options.windowTitle = "TP7 - Documentation API"
-    options.docTitle = "TP7 - Documentation de l'API"
+jacocoTestReport {
+    reports {
+        xml.required = true
+        html.required = true
+    }
 }
 
+sonarqube {
+    properties {
+        property 'sonar.projectKey', 'TP7_Jenkins'
+        property 'sonar.projectName', 'TP7 Jenkins Pipeline'
+        property 'sonar.host.url', 'http://localhost:9000/'
+        property 'sonar.sources', 'src/main/java'
+        property 'sonar.tests', 'src/test/java'
+        property 'sonar.java.binaries', 'build/classes/java/main'
+        property 'sonar.java.libraries', configurations.compileClasspath.files.join(',')
+        property 'sonar.junit.reportPaths', 'build/test-results/test'
+        property 'sonar.coverage.jacoco.xmlReportPaths', 'build/reports/jacoco/test/jacocoTestReport.xml'
+        property 'sonar.token', System.getenv('SONAR_TOKEN') ?: '72522ac6be12d879ce57bb1eeaeaeaba3597c009'
+    }
+}
 
-// Deployment configuration for the 'Deploy' phase [cite: 1]
 publishing {
     repositories {
         maven {
-            // Jenkins will provide these via Global Properties 
-            url = findProperty("url_maven")
+            url = uri(System.getenv('MAVEN_REPO_URL') ?: 'http://mymavenrepo.com/repo/cEmjfkxugPlzLxXg1A2B/')
+            allowInsecureProtocol = true
             credentials {
-                username = findProperty("mavenRepoUser")
-                password = findProperty("mavenRepoPassword")
+                username = System.getenv('MAVEN_USERNAME') ?: 'myMavenRepo'
+                password = System.getenv('MAVEN_PASSWORD') ?: 'test0005'
             }
         }
     }
@@ -52,7 +63,32 @@ publishing {
     publications {
         maven(MavenPublication) {
             from components.java
+            groupId = 'com.example'
+            artifactId = 'tp7-jenkins'
+            version = '1.0.0'
         }
     }
 }
-// add some comments to  test the piepline via github
+
+// Tâche pour générer le JAR
+jar {
+    manifest {
+        attributes(
+                'Implementation-Title': project.name,
+                'Implementation-Version': project.version
+        )
+    }
+}
+
+// Tâche pour générer la documentation Javadoc
+javadoc {
+    source = sourceSets.main.allJava
+    classpath = configurations.compileClasspath
+    options.encoding = 'UTF-8'
+    options.charSet = 'UTF-8'
+}
+
+// Finaliser les tests avec le rapport JaCoCo
+tasks.named('test') {
+    finalizedBy 'jacocoTestReport'
+}
