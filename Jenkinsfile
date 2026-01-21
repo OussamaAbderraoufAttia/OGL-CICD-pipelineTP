@@ -1,22 +1,25 @@
 pipeline {
     agent any
 
-    stages {
+    // Accessing properties defined in gradle.properties
+    environment {
+        // These will be read from gradle.properties automatically by Gradle,
+        // but we can also reference them here if needed via readProperties
+        SONAR_HOST = "http://localhost:9000"
+    }
 
+    stages {
         // ========================================
         // Phase 1 : TEST
         // ========================================
         stage('Test') {
             steps {
                 echo '========== Phase Test =========='
-
-                echo '1. Lancement des tests unitaires...'
                 bat 'gradlew.bat test'
 
-                echo '2. Archivage des resultats des tests unitaires...'
+                echo 'Archivage des resultats...'
                 junit '**/build/test-results/test/*.xml'
 
-                echo '3. Generation des rapports Cucumber...'
                 cucumber buildStatus: 'SUCCESS',
                          reportTitle: 'Cucumber Test Report',
                          fileIncludePattern: '**/*.json',
@@ -30,13 +33,10 @@ pipeline {
         stage('Code Analysis') {
             steps {
                 echo '========== Phase Code Analysis =========='
-
                 withSonarQubeEnv('sonar') {
-                    withCredentials([string(
-                        credentialsId: 'sonar-token',
-                        variable: 'SONAR_TOKEN'
-                    )]) {
-                        bat 'gradlew.bat sonar -Dsonar.login=%SONAR_TOKEN%'
+                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+                        // The sonar host is pulled from gradle.properties (systemProp.sonar.host.url)
+                        bat "gradlew.bat sonar -Dsonar.login=%SONAR_TOKEN%"
                     }
                 }
             }
@@ -47,11 +47,9 @@ pipeline {
         // ========================================
         stage('Code Quality Gate') {
             steps {
-                echo '========== Phase Code Quality =========='
                 timeout(time: 1, unit: 'HOURS') {
                     waitForQualityGate abortPipeline: true
                 }
-                echo 'Quality Gate PASSED ✓'
             }
         }
 
@@ -61,14 +59,9 @@ pipeline {
         stage('Build') {
             steps {
                 echo '========== Phase Build =========='
-
-                echo '1. Generation du fichier JAR...'
                 bat 'gradlew.bat jar'
-
-                echo '2. Generation de la documentation...'
                 bat 'gradlew.bat javadoc'
 
-                echo '3. Archivage des artefacts...'
                 archiveArtifacts artifacts: '**/build/libs/*.jar', fingerprint: true
                 archiveArtifacts artifacts: '**/build/docs/javadoc/**', fingerprint: true
             }
@@ -80,16 +73,17 @@ pipeline {
         stage('Deploy') {
             steps {
                 echo '========== Phase Deploy =========='
-
+                // Uses 'maven-repo-creds' which should contain:
+                // Username: myMavenRepo
+                // Password: test0005
                 withCredentials([usernamePassword(
                     credentialsId: 'maven-repo-creds',
                     usernameVariable: 'MAVEN_USERNAME',
                     passwordVariable: 'MAVEN_PASSWORD'
                 )]) {
+                    // Gradle will use url_maven from gradle.properties
                     bat 'gradlew.bat publish'
                 }
-
-                echo 'Deploiement sur myMavenRepo reussi'
             }
         }
     }
@@ -98,43 +92,36 @@ pipeline {
     // Phase 6 : NOTIFICATION
     // ========================================
     post {
-
         success {
             script {
-                // EMAIL (non-blocking)
+                // Email using variables from gradle.properties or environment
                 try {
                     emailext(
                         subject: "SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                         body: """
                             <h2>Deploiement reussi</h2>
                             <p><b>Projet:</b> ${env.JOB_NAME}</p>
-                            <p><b>Build:</b> #${env.BUILD_NUMBER}</p>
                             <p><b>Status:</b> SUCCESS</p>
                             <p><a href='${env.BUILD_URL}'>Voir le build</a></p>
                         """,
                         to: "li_sraich@esi.dz",
-                        mimeType: 'text/html',
-                        replyTo: "lo_attia@esi.dz"
+                        replyTo: "lo_attia@esi.dz",
+                        mimeType: 'text/html'
                     )
                 } catch (err) {
-                    echo "Email failed (SMTP/network restriction)"
-                    echo err.toString()
+                    echo "Email failed: ${err.toString()}"
                 }
 
-                // SLACK (blocking is OK)
-                withCredentials([string(
-                    credentialsId: 'slack-webhook',
-                    variable: 'SLACK_WEBHOOK'
-                )]) {
+                // Slack Notification
+                withCredentials([string(credentialsId: 'slack-webhook', variable: 'SLACK_WEBHOOK_URL')]) {
                     bat """
                         curl -X POST -H "Content-type: application/json" ^
                         --data "{\\"text\\":\\"Deploiement reussi : ${env.JOB_NAME} #${env.BUILD_NUMBER}\\"}" ^
-                        %SLACK_WEBHOOK%
+                        %SLACK_WEBHOOK_URL%
                     """
                 }
             }
         }
-
 
         failure {
             script {
@@ -142,20 +129,17 @@ pipeline {
                     emailext(
                         subject: "FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                         body: "Pipeline failed: ${env.BUILD_URL}",
-                        to: "mm_rouabhi@esi.dz"
+                        to: "lo_attia@esi.dz"
                     )
                 } catch (err) {
-                    echo "Email failed (SMTP/network restriction)"
+                    echo "Email failed"
                 }
 
-                withCredentials([string(
-                    credentialsId: 'slack-webhook',
-                    variable: 'SLACK_WEBHOOK'
-                )]) {
+                withCredentials([string(credentialsId: 'slack-webhook', variable: 'SLACK_WEBHOOK_URL')]) {
                     bat """
                         curl -X POST -H "Content-type: application/json" ^
-                        --data "{\\"text\\":\\"echec du pipeline : ${env.JOB_NAME} #${env.BUILD_NUMBER}\\"}" ^
-                        %SLACK_WEBHOOK%
+                        --data "{\\"text\\":\\"Echec du pipeline : ${env.JOB_NAME} #${env.BUILD_NUMBER}\\"}" ^
+                        %SLACK_WEBHOOK_URL%
                     """
                 }
             }
